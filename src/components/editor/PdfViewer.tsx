@@ -6,18 +6,13 @@ import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle, FileText } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Configure the PDF.js worker. This is crucial for PDF.js to work.
-// It tells PDF.js where to load its worker script from.
-// Using a URL constructor with import.meta.url is a modern way to get the path relative to the module.
-// Next.js (with Webpack) should bundle the worker and make it available.
+// Configure the PDF.js worker.
+// PDF.js worker is now expected to be in the /public directory.
 if (typeof window !== 'undefined') { // Ensure this only runs in the browser
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.js',
-    import.meta.url // This provides the base URL for the current module
-  ).toString();
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 }
 
 
@@ -254,7 +249,3 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
     </main>
   );
 }
-
-// Add FileText icon to imports if it's not already there for the "No PDF Loaded" state
-// import { FileText, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
-// It is now included.
