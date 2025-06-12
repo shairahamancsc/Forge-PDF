@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import UserNav from './UserNav';
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { createClient } from '@/utils/supabase/client'; // Use client Supabase
+import { createClient } from '@/utils/supabase/client'; 
 import { usePathname, useRouter } from 'next/navigation';
 
 export default function AppHeader() {
@@ -29,7 +29,7 @@ export default function AppHeader() {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       if (event === 'SIGNED_IN' && (pathname === '/login' || pathname === '/register')) {
-        router.refresh(); // Refresh to ensure server components know about the new session
+        router.refresh(); 
       }
       if (event === 'SIGNED_OUT') {
         router.refresh();
@@ -37,7 +37,7 @@ export default function AppHeader() {
     });
 
     return () => {
-      authListener?.unsubscribe();
+      authListener?.subscription?.unsubscribe();
     };
   }, [pathname, router, supabase.auth]);
 
@@ -47,10 +47,7 @@ export default function AppHeader() {
     return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"><div className="container flex h-16 items-center justify-between"><Logo /></div></header>;
   }
   if (!isLoading && user && isAuthPage && pathname !== '/auth/callback' ) {
-     // User is logged in and on an auth page, typically means they are being redirected by router.push or manually navigated.
-     // For Supabase, if a session exists, /login and /register should ideally redirect to /dashboard via middleware or page logic.
-     // This client-side redirect is a fallback.
-     router.push('/dashboard'); // Redirect to dashboard
+     router.push('/dashboard'); 
      return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"><div className="container flex h-16 items-center justify-between"><Logo /></div></header>;
   }
 

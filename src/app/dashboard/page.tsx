@@ -52,13 +52,13 @@ export default function DashboardPage() {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      if (event === 'SIGNED_OUT' || (!currentUser && !isLoadingAuth)) { // Check !isLoadingAuth to avoid redirect during initial load
+      if (event === 'SIGNED_OUT' || (!currentUser && !isLoadingAuth)) { 
         router.push('/login');
       }
     });
 
     return () => {
-      authListener?.unsubscribe();
+      authListener?.subscription?.unsubscribe();
     };
   }, [router, supabase.auth, isLoadingAuth]);
 

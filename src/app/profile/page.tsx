@@ -13,7 +13,7 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { updateUserFullName, sendPasswordResetEmail, getCurrentUser } from "@/app/actions/auth"; // Server actions
+import { updateUserFullName, sendPasswordResetEmail } from "@/app/actions/auth";
 
 const getInitials = (name: string | null | undefined) => {
   if (!name) return "U";
@@ -35,7 +35,6 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [fullName, setFullName] = useState("");
   
-  // Placeholder data for subscription - replace with actual logic
   const [subscriptionPlan, setSubscriptionPlan] = useState("Free Tier"); 
 
   useEffect(() => {
@@ -46,8 +45,6 @@ export default function ProfilePage() {
       } else {
         setUser(currentUser);
         setFullName(currentUser.user_metadata?.full_name || "");
-        // In a real app, fetch subscription status from your backend/Supabase
-        // For now, we use a placeholder
       }
       setIsLoading(false);
     };
@@ -63,7 +60,7 @@ export default function ProfilePage() {
       }
     });
     return () => {
-      authListener?.unsubscribe();
+      authListener?.subscription?.unsubscribe();
     };
   }, [router, supabase.auth]);
 
@@ -73,11 +70,14 @@ export default function ProfilePage() {
       return;
     }
     setIsSaving(true);
-    const result = await updateUserFullName(user.id, fullName);
+    const result = await updateUserFullName(user.id, fullName); // user.id is not directly available, use user from state.
     setIsSaving(false);
     if (result.success) {
       toast({ title: "Profile Updated", description: "Your full name has been updated." });
-      if (result.user) setUser(result.user); // Update local user state with potentially new metadata
+      if (result.user) { // Supabase updateUser returns user in `data.user`
+        setUser(result.user); // Update local user state
+        setFullName(result.user.user_metadata?.full_name || ""); // Update local fullName state
+      }
     } else {
       toast({ title: "Update Failed", description: result.message, variant: "destructive" });
     }
@@ -88,9 +88,9 @@ export default function ProfilePage() {
         toast({ title: "Error", description: "User email not found.", variant: "destructive"});
         return;
     }
-    setIsLoading(true); // Use general loading state for this action
+    // setIsSaving(true); // Using isSaving for this too, can rename state if needed
     const result = await sendPasswordResetEmail(user.email);
-    setIsLoading(false);
+    // setIsSaving(false);
     if (result.success) {
         toast({ title: "Password Reset Email Sent", description: result.message});
     } else {
@@ -117,10 +117,10 @@ export default function ProfilePage() {
         <CardHeader className="items-center text-center">
           <div className="relative mb-4">
             <Avatar className="h-24 w-24 ring-4 ring-primary/50">
-              <AvatarImage src={avatarUrl || `https://placehold.co/150x150.png?text=${getInitials(displayName)}`} alt={displayName} data-ai-hint="profile picture" />
+              <AvatarImage src={avatarUrl || `https://placehold.co/150x150.png?text=${getInitials(displayName)}`} alt={displayName} data-ai-hint="profile picture"/>
               <AvatarFallback className="text-3xl">{getInitials(displayName)}</AvatarFallback>
             </Avatar>
-            <Button variant="outline" size="icon" className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-background" disabled> {/* Avatar editing TBD */}
+            <Button variant="outline" size="icon" className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-background" disabled>
               <Edit2 className="h-4 w-4" />
               <span className="sr-only">Edit avatar</span>
             </Button>
@@ -161,8 +161,8 @@ export default function ProfilePage() {
           <div>
             <h3 className="text-lg font-semibold mb-3 text-foreground">Security</h3>
             <div className="space-y-3">
-              <Button variant="outline" className="w-full justify-start gap-2" onClick={handleChangePassword} disabled={isLoading || isSaving}>
-                {isLoading || isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />} 
+              <Button variant="outline" className="w-full justify-start gap-2" onClick={handleChangePassword} disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />} 
                 Change Password
               </Button>
             </div>
@@ -177,8 +177,8 @@ export default function ProfilePage() {
                   <p className="font-medium text-foreground">Current Plan: <span className="text-primary font-semibold">{subscriptionPlan}</span></p>
                   {subscriptionPlan === "Free Tier" && <p className="text-sm text-muted-foreground">Upgrade to Pro for unlimited documents and advanced features.</p>}
                 </div>
-                {subscriptionPlan === "Free Tier" && <Button variant="default" size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled>Upgrade to Pro</Button>} {/* Upgrade TBD */}
-                {subscriptionPlan !== "Free Tier" && <Button variant="outline" size="sm" disabled>Manage Subscription</Button>} {/* Manage TBD */}
+                {subscriptionPlan === "Free Tier" && <Button variant="default" size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled>Upgrade to Pro</Button>}
+                {subscriptionPlan !== "Free Tier" && <Button variant="outline" size="sm" disabled>Manage Subscription</Button>}
               </div>
           </div>
 
