@@ -2,19 +2,14 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-// USE THE WEBPACK ENTRY POINT
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/webpack';
+// Import from the main 'pdfjs-dist' entry point
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import type { PDFDocumentProxy, PDFPageProxy, PDFDocumentLoadingTask } from 'pdfjs-dist';
-// Ensure that the type for PDFWorker is also imported if you use it directly,
-// though it's often not needed for basic setup with the webpack entry.
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle, FileText } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
-
-// The 'pdfjs-dist/webpack' entry point should configure the worker automatically.
-// So, manual workerSrc configuration is typically not needed with this import.
 
 interface PdfViewerProps {
   fileUrl: string;
@@ -31,6 +26,15 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   const [pageRendering, setPageRendering] = useState<boolean>(false);
 
   useEffect(() => {
+    // Set the workerSrc for PDF.js.
+    // This file needs to be manually copied to the `public` folder.
+    // It must match the version of pdfjs-dist installed in node_modules.
+    if (typeof window !== 'undefined') {
+      GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`;
+    }
+  }, []); // Run this effect once on component mount.
+
+  useEffect(() => {
     let isMounted = true;
     let currentLoadingTask: PDFDocumentLoadingTask | null = null;
     let currentPdfDoc: PDFDocumentProxy | null = null;
@@ -44,9 +48,8 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
       
       setIsLoading(true);
       setError(null);
-      // Clear previous document state
       if (pdfDoc) {
-        pdfDoc.destroy(); // Clean up previous document if any
+        pdfDoc.destroy();
       }
       setPdfDoc(null);
       setPageNum(1);
@@ -62,7 +65,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
           setNumPages(loadedPdfDoc.numPages);
           setIsLoading(false);
         } else {
-          loadedPdfDoc.destroy(); // component unmounted during load
+          loadedPdfDoc.destroy();
         }
       } catch (reason: any) {
         console.error(`Error loading PDF from URL: ${fileUrl}`, reason);
@@ -80,7 +83,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
       currentLoadingTask?.destroy();
       currentPdfDoc?.destroy();
     };
-  }, [fileUrl]); // pdfDoc should not be in dependency array to avoid loop with destroy
+  }, [fileUrl]);
 
   const renderPage = useCallback(async () => {
     if (!pdfDoc || !canvasRef.current || pageNum === 0) return;
@@ -112,7 +115,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
     } finally {
       setPageRendering(false);
     }
-  }, [pdfDoc, pageNum, scale, fileUrl]); // Added fileUrl to dependency array for logging
+  }, [pdfDoc, pageNum, scale, fileUrl]); 
 
   useEffect(() => {
     if (pdfDoc && pageNum > 0) {
@@ -142,7 +145,6 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (val === "") {
-      // User might be clearing to type a new number, do nothing yet or handle as temp state
       return;
     }
     let newPage = parseInt(val, 10);
@@ -153,9 +155,6 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   
   const handlePageInputBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
      if (e.target.value === "" && pdfDoc && numPages > 0) {
-        // if input is empty on blur, reset to current valid pageNum visually
-        // but the state `pageNum` is already valid.
-        // This just makes the input field reflect the state if user cleared it and tabbed out.
         e.target.value = pageNum.toString();
      }
   };
@@ -179,7 +178,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
           <p className="text-lg font-semibold text-destructive">Error Loading PDF</p>
           <p className="text-sm text-muted-foreground mt-2 mb-1">{error}</p>
           <p className="text-xs text-muted-foreground break-all">Attempted URL: {fileUrl || 'N/A'}</p>
-          <Button variant="outline" onClick={() => {setError(null); setIsLoading(true); setPageNum(1); /* consider re-calling loadPdf or relying on fileUrl change */ }} className="mt-4">
+          <Button variant="outline" onClick={() => {setError(null); setIsLoading(true); /* Force re-load, re-triggers loadPdf effect if fileUrl changes or component remounts */ }} className="mt-4">
             Try Again
           </Button>
         </div>
@@ -193,7 +192,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
         <div className="w-full max-w-xl bg-background shadow-lg rounded-md flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
            <p className="text-lg font-semibold">No PDF Loaded or Empty PDF</p>
-           <p className="text-sm">The PDF at {fileUrl} could not be processed or is empty.</p>
+           <p className="text-sm">The PDF at {fileUrl || 'the specified URL'} could not be processed or is empty.</p>
         </div>
       </main>
     );
@@ -209,7 +208,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
           <span className="hidden sm:inline mr-1">Page</span>
           <Input
             type="number"
-            value={pageNum.toString()} // Controlled component
+            value={pageNum.toString()} 
             onChange={handlePageInputChange}
             onBlur={handlePageInputBlur}
             min="1"
@@ -249,3 +248,4 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
     </main>
   );
 }
+
