@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -8,25 +9,55 @@ import { ArrowDownUp, Download, Edit, FileText, Filter, GripVertical, List, More
 import Image from "next/image";
 import Link from 'next/link';
 import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-// Placeholder data for PDFs
-const userPdfs = [
+// Placeholder data for initial PDFs
+const initialUserPdfs = [
   { id: "1", name: "Contract_Draft_v3.pdf", size: "2.5 MB", lastModified: "2024-07-28", thumbnailUrl: "https://placehold.co/300x400.png?text=PDF1" },
   { id: "2", name: "Presentation_Slides.pdf", size: "10.1 MB", lastModified: "2024-07-27", thumbnailUrl: "https://placehold.co/300x400.png?text=PDF2" },
   { id: "3", name: "Research_Paper_Final.pdf", size: "850 KB", lastModified: "2024-07-25", thumbnailUrl: "https://placehold.co/300x400.png?text=PDF3" },
   { id: "4", name: "Invoice_July.pdf", size: "120 KB", lastModified: "2024-07-22", thumbnailUrl: "https://placehold.co/300x400.png?text=PDF4" },
 ];
 
+interface PdfDocument {
+  id: string;
+  name: string;
+  size: string;
+  lastModified: string;
+  thumbnailUrl: string;
+}
+
 export default function DashboardPage() {
+  const router = useRouter();
+  const [pdfs, setPdfs] = useState<PdfDocument[]>(initialUserPdfs);
   // TODO: Implement view toggle (grid/list) state
   // TODO: Implement sorting and filtering logic
-  // TODO: Implement actual file upload logic
+  
+  const handleFileUpload = (file: File) => {
+    console.log("Uploaded on Dashboard:", file.name);
+    
+    const newPdfId = file.name.replace(/[^a-zA-Z0-9_.-]/g, '-').toLowerCase() + '-' + Date.now();
+    const newPdf: PdfDocument = {
+      id: newPdfId,
+      name: file.name,
+      size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+      lastModified: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format
+      thumbnailUrl: `https://placehold.co/300x400.png?text=${encodeURIComponent(file.name.substring(0,10))}`,
+    };
+
+    // Add to local state for immediate UI update (optional but good UX)
+    setPdfs(prevPdfs => [newPdf, ...prevPdfs]);
+
+    // Navigate to the editor page for the new PDF
+    router.push(`/editor/${newPdf.id}`);
+  };
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <h1 className="text-3xl font-bold font-headline">Your Documents</h1>
-        <FileUpload onFileUpload={(file) => console.log("Uploaded:", file.name)} />
+        <FileUpload onFileUpload={handleFileUpload} />
       </div>
 
       <div className="mb-6 flex flex-col md:flex-row gap-4 items-center">
@@ -60,23 +91,22 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {userPdfs.length === 0 ? (
+      {pdfs.length === 0 ? (
         <div className="text-center py-16 border-2 border-dashed border-border rounded-lg">
           <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold mb-2">No Documents Yet</h2>
           <p className="text-muted-foreground mb-4">Upload your first PDF to get started.</p>
-          {/* Simplified upload, main button is above */}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {userPdfs.map((pdf) => (
+          {pdfs.map((pdf) => (
             <Card key={pdf.id} className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
               <CardHeader className="p-0 relative aspect-[3/4]">
                 <Image
                   src={pdf.thumbnailUrl}
                   alt={`Thumbnail for ${pdf.name}`}
-                  layout="fill"
-                  objectFit="cover"
+                  fill // Changed from layout="fill" objectFit="cover" for Next 13+ Image
+                  style={{ objectFit: 'cover' }} // Added style for objectFit
                   className="bg-muted"
                   data-ai-hint="document thumbnail"
                 />
@@ -127,3 +157,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+      
