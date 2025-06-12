@@ -52,10 +52,13 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
             <Button size="lg" asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Link href="/register">Get Started for Free</Link>
+              <Link href="/dashboard">Upload Your PDF</Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/editor/sample-document">Try Our Editor</Link>
+              <Link href="/editor/sample-document">Try Live Demo</Link>
+            </Button>
+            <Button size="lg" variant="secondary" asChild>
+              <Link href="/register">Create Free Account</Link>
             </Button>
           </div>
           <div className="mt-16 relative max-w-4xl mx-auto">
@@ -150,7 +153,7 @@ export default function HomePage() {
             Sign up today and experience the future of PDF editing.
           </p>
           <Button size="lg" variant="secondary" asChild className="text-primary hover:bg-secondary/90">
-            <Link href="/register">Start Forging - It's Free!</Link>
+            <Link href="/dashboard">Start Forging - It's Free!</Link>
           </Button>
         </div>
       </section>
