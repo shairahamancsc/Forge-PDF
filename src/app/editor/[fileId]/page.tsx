@@ -1,3 +1,4 @@
+
 import EditorToolbar from "@/components/editor/EditorToolbar";
 import PdfViewer from "@/components/editor/PdfViewer";
 import { Button } from "@/components/ui/button";
@@ -17,16 +18,13 @@ async function getFileDetails(fileId: string) {
     return {
       id: "sample-document",
       name: "Sample_Document.pdf",
-      // You could provide a real public URL to a sample PDF here if PdfViewer supported it
-      // For now, PdfViewer will show its placeholder content with this name.
     };
   }
   
-  // Mock data for other file IDs, assuming they exist for logged-in users if we reach here.
-  // In a real app, you'd query Firestore. If not found, you'd handle that (e.g., 404).
+  // Mock data for other file IDs
   return {
     id: fileId,
-    name: `Document_${fileId}.pdf`, 
+    name: `Document_${fileId.replace('.pdf-', '_').replace(/-/g, '_')}.pdf`, 
   };
 }
 
@@ -39,6 +37,9 @@ export default async function EditorPage({ params }: EditorPageProps) {
     return <div className="container mx-auto p-4 text-center">File not found or you do not have permission to view it.</div>;
   }
   
+  // For now, always use /sample.pdf. User needs to create public/sample.pdf
+  const actualPdfUrl = "/sample.pdf";
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden"> {/* 4rem is approx header height */}
       {/* Editor Header */}
@@ -71,9 +72,7 @@ export default async function EditorPage({ params }: EditorPageProps) {
       {/* Editor Main Area */}
       <div className="flex flex-1 overflow-hidden">
         <EditorToolbar />
-        {/* For a real sample PDF, you'd pass its URL here. 
-            Using a generic placeholder URL for now, PdfViewer will display the file name. */}
-        <PdfViewer fileUrl={`/api/placeholder-pdf/${fileDetails.id}`} />
+        <PdfViewer fileUrl={actualPdfUrl} />
       </div>
     </div>
   );
