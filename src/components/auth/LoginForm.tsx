@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +16,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useState } from "react";
-import { signInWithEmail, signInWithGoogle } from "@/app/actions/auth"; // Placeholder
+import { signInWithEmail, signInWithGoogle, sendPasswordResetEmail } from "@/app/actions/auth";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -25,6 +28,8 @@ const formSchema = z.object({
 export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -36,22 +41,46 @@ export default function LoginForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    // console.log("Form submitted", values);
-    // await signInWithEmail(values); // Placeholder
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000)); 
-    console.log("Simulated login for:", values.email);
+    const result = await signInWithEmail(values);
     setIsLoading(false);
-    // Handle successful login (e.g., redirect) or error
+
+    if (result.success) {
+      toast({ title: "Login Successful", description: result.message });
+      router.push("/dashboard");
+    } else {
+      toast({ title: "Login Failed", description: result.message, variant: "destructive" });
+      form.setError("password", { type: "manual", message: result.message });
+    }
   }
 
   async function handleGoogleSignIn() {
     setIsLoading(true);
-    // await signInWithGoogle(); // Placeholder
-    console.log("Simulated Google Sign In");
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const result = await signInWithGoogle();
     setIsLoading(false);
+    if (result.success) {
+      toast({ title: "Google Sign-In Successful", description: result.message });
+      router.push("/dashboard");
+    } else {
+      toast({ title: "Google Sign-In Failed", description: result.message, variant: "destructive" });
+    }
   }
+
+  const handleForgotPassword = async () => {
+    const email = form.getValues("email");
+    if (!email || !z.string().email().safeParse(email).success) {
+      toast({ title: "Invalid Email", description: "Please enter a valid email address to reset password.", variant: "destructive"});
+      form.setError("email", { type: "manual", message: "Please enter a valid email address." });
+      return;
+    }
+    setIsLoading(true);
+    const result = await sendPasswordResetEmail(email);
+    setIsLoading(false);
+    if (result.success) {
+      toast({ title: "Password Reset Email Sent", description: result.message });
+    } else {
+      toast({ title: "Password Reset Failed", description: result.message, variant: "destructive" });
+    }
+  };
 
   return (
     <Form {...form}>
@@ -96,6 +125,7 @@ export default function LoginForm() {
                   className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={isLoading}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </Button>
@@ -105,7 +135,7 @@ export default function LoginForm() {
           )}
         />
         <div className="flex justify-end">
-          <Button variant="link" type="button" className="p-0 h-auto text-sm text-primary" disabled={isLoading}>
+          <Button variant="link" type="button" onClick={handleForgotPassword} className="p-0 h-auto text-sm text-primary" disabled={isLoading}>
             Forgot password?
           </Button>
         </div>
@@ -124,8 +154,7 @@ export default function LoginForm() {
         </div>
       </div>
       <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isLoading}>
-        {/* Google Icon SVG or Lucide Icon if available */}
-        <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+        <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
           <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
           <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />

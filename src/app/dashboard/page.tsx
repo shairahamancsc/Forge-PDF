@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import FileUpload from "@/components/ui/FileUpload";
-import { ArrowDownUp, Download, Edit, FileText, Filter, GripVertical, List, MoreHorizontal, PlusCircle, Search, Trash2 } from "lucide-react";
+import { ArrowDownUp, Download, Edit, FileText, Filter, GripVertical, List, MoreHorizontal, PlusCircle, Search, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 // Placeholder data for initial PDFs
 const initialUserPdfs = [
@@ -31,11 +33,28 @@ interface PdfDocument {
 export default function DashboardPage() {
   const router = useRouter();
   const [pdfs, setPdfs] = useState<PdfDocument[]>(initialUserPdfs);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
   // TODO: Implement view toggle (grid/list) state
   // TODO: Implement sorting and filtering logic
   
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+      } else {
+        router.push("/login"); // Redirect to login if not authenticated
+      }
+      setIsLoadingAuth(false);
+    });
+    return () => unsubscribe();
+  }, [router]);
+
   const handleFileUpload = (file: File) => {
-    console.log("Uploaded on Dashboard:", file.name);
+    // TODO: Implement actual file upload to Firebase Storage
+    // and metadata saving to Firestore.
+    console.log("Uploaded on Dashboard by user:", user?.uid, file.name);
     
     const newPdfId = file.name.replace(/[^a-zA-Z0-9_.-]/g, '-').toLowerCase() + '-' + Date.now();
     const newPdf: PdfDocument = {
@@ -52,6 +71,14 @@ export default function DashboardPage() {
     // Navigate to the editor page for the new PDF
     router.push(`/editor/${newPdf.id}`);
   };
+
+  if (isLoadingAuth || !user) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-4rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-6">
@@ -105,8 +132,8 @@ export default function DashboardPage() {
                 <Image
                   src={pdf.thumbnailUrl}
                   alt={`Thumbnail for ${pdf.name}`}
-                  fill // Changed from layout="fill" objectFit="cover" for Next 13+ Image
-                  style={{ objectFit: 'cover' }} // Added style for objectFit
+                  fill
+                  style={{ objectFit: 'cover' }}
                   className="bg-muted"
                   data-ai-hint="document thumbnail"
                 />
@@ -157,5 +184,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-      

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,16 +14,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, UserCircle } from "lucide-react";
 import Link from "next/link";
+import type { User } from "firebase/auth";
+import { signOut } from "@/app/actions/auth";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
-export default function UserNav() {
-  // Placeholder user data
-  const user = {
-    name: "User Name",
-    email: "user@example.com",
-    avatarUrl: "https://placehold.co/100x100.png",
-  };
+interface UserNavProps {
+  user: User | null;
+}
 
-  const getInitials = (name: string) => {
+export default function UserNav({ user }: UserNavProps) {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "U";
     const names = name.split(' ');
     let initials = names[0].substring(0, 1).toUpperCase();
     if (names.length > 1) {
@@ -31,21 +37,34 @@ export default function UserNav() {
     return initials;
   };
 
+  const handleSignOut = async () => {
+    const result = await signOut();
+    if (result.success) {
+      toast({ title: "Signed Out", description: "You have been successfully signed out." });
+      router.push('/'); // Redirect to homepage or login
+    } else {
+      toast({ title: "Sign Out Failed", description: result.message, variant: "destructive" });
+    }
+  };
+
+  if (!user) {
+    return null; // Or some other placeholder if needed
+  }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="user avatar" />
-            <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+            <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User Avatar"} data-ai-hint="user avatar" />
+            <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.name}</p>
+            <p className="text-sm font-medium leading-none">{user.displayName || "User"}</p>
             <p className="text-xs leading-none text-muted-foreground">
               {user.email}
             </p>
@@ -54,7 +73,7 @@ export default function UserNav() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/profile" className="flex items-center"> {/* Updated to /profile from /settings */}
+            <Link href="/profile" className="flex items-center">
               <UserCircle className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </Link>
@@ -67,10 +86,9 @@ export default function UserNav() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
-          {/* Add logout action here */}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
