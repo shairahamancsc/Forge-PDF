@@ -41,21 +41,25 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
 
     const loadPdf = async () => {
       if (!fileUrl) {
-        setError("No file URL provided.");
-        setIsLoading(false);
+        if (isMounted) {
+            setError("No file URL provided to the PDF viewer.");
+            setIsLoading(false);
+        }
         return;
       }
       
       setIsLoading(true);
       setError(null);
+      // It's good practice to destroy the previous PDF document instance if it exists
       if (pdfDoc) {
         pdfDoc.destroy();
       }
-      setPdfDoc(null);
-      setPageNum(1);
-      setNumPages(0);
+      setPdfDoc(null); // Clear existing PDF doc
+      setPageNum(1);   // Reset to first page
+      setNumPages(0);  // Reset page count
 
       try {
+        console.log(`Attempting to load PDF from URL: ${fileUrl}`);
         currentLoadingTask = getDocument(fileUrl);
         const loadedPdfDoc = await currentLoadingTask.promise;
         
@@ -65,12 +69,17 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
           setNumPages(loadedPdfDoc.numPages);
           setIsLoading(false);
         } else {
+          // Component unmounted before loading finished, destroy the doc
           loadedPdfDoc.destroy();
         }
       } catch (reason: any) {
         console.error(`Error loading PDF from URL: ${fileUrl}`, reason);
         if (isMounted) {
-          setError(`Failed to load PDF from ${fileUrl}. ${reason.message || 'Please ensure the URL is correct and the file is accessible.'}`);
+          let specificMessage = `Failed to load PDF from ${fileUrl}. ${reason.message || 'Please ensure the URL is correct and the file is accessible.'}`;
+          if (fileUrl === "/sample.pdf" && (reason.name === 'MissingPDFException' || (reason.message && reason.message.includes('Missing PDF')))) {
+            specificMessage = `Failed to load '/sample.pdf'. This usually means the file 'public/sample.pdf' is missing or not deployed correctly. Please ensure the file exists in your project's 'public' folder and has been successfully deployed. Original error: ${reason.message}`;
+          }
+          setError(specificMessage);
           setIsLoading(false);
         }
       }
@@ -81,12 +90,24 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
     return () => {
       isMounted = false;
       currentLoadingTask?.destroy();
-      currentPdfDoc?.destroy();
+      // Ensure the PDF document is destroyed if it was loaded
+      if (currentPdfDoc) {
+        currentPdfDoc.destroy();
+      } else if (pdfDoc && !isMounted) { 
+        // If pdfDoc was set from a previous render but component unmounted before currentPdfDoc was assigned
+        pdfDoc.destroy();
+      }
     };
-  }, [fileUrl]);
+  }, [fileUrl]); // Rerun effect if fileUrl changes
 
   const renderPage = useCallback(async () => {
-    if (!pdfDoc || !canvasRef.current || pageNum === 0) return;
+    if (!pdfDoc || !canvasRef.current || pageNum === 0 || pageNum > numPages) {
+        // Added check for pageNum > numPages to prevent errors if pageNum is somehow out of bounds
+        if (pdfDoc && (pageNum === 0 || pageNum > numPages) && numPages > 0) {
+             console.warn(`Attempted to render invalid page number: ${pageNum} (Total pages: ${numPages})`);
+        }
+        return;
+    }
 
     setPageRendering(true);
     try {
@@ -94,8 +115,9 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
       const canvas: HTMLCanvasElement = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        if (typeof window !== 'undefined') console.error("Could not get canvas context.");
-        setError("Could not get canvas context.");
+        // This error is critical, should not happen in normal circumstances
+        if (typeof window !== 'undefined') console.error("Could not get 2D canvas context.");
+        setError("Critical error: Could not get canvas context for PDF rendering.");
         setPageRendering(false);
         return;
       }
@@ -111,17 +133,18 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
       await page.render(renderContext).promise;
     } catch (e: any) {
       if (typeof window !== 'undefined') console.error(`Error rendering page ${pageNum} of PDF from URL: ${fileUrl}`, e);
-      setError(`Error rendering page ${pageNum} of PDF from ${fileUrl}. ${e.message || ''}`);
+      // Avoid setting error if it's just a page rendering issue that might be transient or related to scale
+      // setError(`Error rendering page ${pageNum}. ${e.message || ''}`);
     } finally {
       setPageRendering(false);
     }
-  }, [pdfDoc, pageNum, scale, fileUrl]); 
+  }, [pdfDoc, pageNum, scale, fileUrl, numPages]); // Added numPages as a dependency
 
   useEffect(() => {
-    if (pdfDoc && pageNum > 0) {
+    if (pdfDoc && pageNum > 0 && pageNum <= numPages) { // Ensure pageNum is valid
       renderPage();
     }
-  }, [pdfDoc, pageNum, scale, renderPage]);
+  }, [pdfDoc, pageNum, scale, renderPage, numPages]); // Added numPages
 
 
   const handlePreviousPage = () => {
@@ -145,17 +168,31 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (val === "") {
+      // Allow clearing the input, don't immediately set pageNum
       return;
     }
     let newPage = parseInt(val, 10);
     if (!isNaN(newPage) && newPage >= 1 && newPage <= numPages) {
       setPageNum(newPage);
+    } else if (!isNaN(newPage) && newPage > numPages) {
+        // If user types a number greater than numPages, maybe just set to max? Or let blur handle it.
+        // For now, let blur handle it. Or set it to newPage and let renderPage handle invalid page.
     }
   };
   
   const handlePageInputBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
-     if (e.target.value === "" && pdfDoc && numPages > 0) {
+     const val = e.target.value;
+     if (val === "" && pdfDoc && numPages > 0) {
+        // If input is cleared, reset to current valid pageNum
         e.target.value = pageNum.toString();
+     } else {
+        let newPage = parseInt(val, 10);
+        if (isNaN(newPage) || newPage < 1) {
+            e.target.value = pageNum.toString(); // Reset to current valid page if invalid
+        } else if (newPage > numPages) {
+            e.target.value = numPages.toString(); // Cap at max pages
+            setPageNum(numPages);
+        }
      }
   };
 
@@ -173,12 +210,12 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   if (error) {
     return (
       <main className="flex-1 bg-muted/40 p-4 overflow-auto flex flex-col items-center justify-center text-center">
-        <div className="w-full max-w-xl bg-background shadow-lg rounded-md flex flex-col items-center justify-center p-8">
+        <div className="w-full max-w-2xl bg-background shadow-lg rounded-md flex flex-col items-center justify-center p-8">
           <AlertCircle className="h-12 w-12 text-destructive mb-4" />
           <p className="text-lg font-semibold text-destructive">Error Loading PDF</p>
-          <p className="text-sm text-muted-foreground mt-2 mb-1">{error}</p>
-          <p className="text-xs text-muted-foreground break-all">Attempted URL: {fileUrl || 'N/A'}</p>
-          <Button variant="outline" onClick={() => {setError(null); setIsLoading(true); /* Force re-load, re-triggers loadPdf effect if fileUrl changes or component remounts */ }} className="mt-4">
+          <p className="text-sm text-muted-foreground mt-2 mb-1 leading-relaxed">{error}</p>
+          <p className="text-xs text-muted-foreground break-all mt-3">Attempted URL: {fileUrl || 'N/A'}</p>
+          <Button variant="outline" onClick={() => {setError(null); loadPdf(); /* Attempt to reload */ }} className="mt-6">
             Try Again
           </Button>
         </div>
@@ -192,7 +229,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
         <div className="w-full max-w-xl bg-background shadow-lg rounded-md flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
            <p className="text-lg font-semibold">No PDF Loaded or Empty PDF</p>
-           <p className="text-sm">The PDF at {fileUrl || 'the specified URL'} could not be processed or is empty.</p>
+           <p className="text-sm">The PDF at {fileUrl || 'the specified URL'} could not be processed or is empty. Ensure the file exists and is a valid PDF.</p>
         </div>
       </main>
     );
@@ -236,12 +273,15 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
         <div className="bg-background shadow-lg rounded-md relative">
           {(pageRendering && !isLoading) && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
-              <Skeleton className="w-full h-full" style={{width: canvasRef.current?.width, height: canvasRef.current?.height}}/>
+              {/* Ensure Skeleton dimensions match canvas if possible, or provide fixed reasonable dimensions */}
+              <Skeleton className="w-full h-full" style={{width: canvasRef.current?.width || '600px', height: canvasRef.current?.height || '800px'}}/>
             </div>
           )}
           <canvas 
             ref={canvasRef} 
             className={(pageRendering && !isLoading) ? 'opacity-30' : ''}
+            // Add some default styling for when the canvas is empty before first render
+            style={{minWidth: '200px', minHeight: '300px'}}
           ></canvas>
         </div>
       </div>
@@ -249,3 +289,56 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
   );
 }
 
+// Helper function for loadPdf, defined outside the component or as a static method if preferred
+async function loadPdfDocument(fileUrl: string, pdfDocRef: React.MutableRefObject<PDFDocumentProxy | null>,
+                                setPdfDocState: (doc: PDFDocumentProxy | null) => void, 
+                                setNumPagesState: (num: number) => void, 
+                                setIsLoadingState: (loading: boolean) => void,
+                                setErrorState: (error: string | null) => void,
+                                isMountedRef: React.MutableRefObject<boolean>) {
+    
+    if (!fileUrl) {
+        if (isMountedRef.current) {
+            setErrorState("No file URL provided to the PDF viewer.");
+            setIsLoadingState(false);
+        }
+        return null;
+    }
+
+    setIsLoadingState(true);
+    setErrorState(null);
+    if (pdfDocRef.current) {
+        pdfDocRef.current.destroy();
+        pdfDocRef.current = null;
+    }
+    setPdfDocState(null);
+    setNumPagesState(0);
+
+    try {
+        console.log(`Attempting to load PDF from URL: ${fileUrl}`);
+        const loadingTask = getDocument(fileUrl);
+        const loadedPdfDoc = await loadingTask.promise;
+        
+        if (isMountedRef.current) {
+            pdfDocRef.current = loadedPdfDoc; // Store in ref for cleanup
+            setPdfDocState(loadedPdfDoc);
+            setNumPagesState(loadedPdfDoc.numPages);
+            setIsLoadingState(false);
+            return loadedPdfDoc; // Return for potential immediate use if needed
+        } else {
+            loadedPdfDoc.destroy();
+            return null;
+        }
+    } catch (reason: any) {
+        console.error(`Error loading PDF from URL: ${fileUrl}`, reason);
+        if (isMountedRef.current) {
+            let specificMessage = `Failed to load PDF from ${fileUrl}. ${reason.message || 'Please ensure the URL is correct and the file is accessible.'}`;
+            if (fileUrl === "/sample.pdf" && (reason.name === 'MissingPDFException' || (reason.message && reason.message.includes('Missing PDF')))) {
+                specificMessage = `Failed to load '/sample.pdf'. This usually means the file 'public/sample.pdf' is missing or not deployed correctly. Please ensure the file exists in your project's 'public' folder and has been successfully deployed. Original error: ${reason.message}`;
+            }
+            setErrorState(specificMessage);
+            setIsLoadingState(false);
+        }
+        return null;
+    }
+}
