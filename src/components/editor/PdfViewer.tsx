@@ -2,8 +2,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+// USE THE WEBPACK ENTRY POINT
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/webpack';
 import type { PDFDocumentProxy, PDFPageProxy, PDFDocumentLoadingTask } from 'pdfjs-dist';
+// Ensure that the type for PDFWorker is also imported if you use it directly,
+// though it's often not needed for basic setup with the webpack entry.
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle, FileText } from 'lucide-react';
@@ -61,9 +65,9 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
           loadedPdfDoc.destroy(); // component unmounted during load
         }
       } catch (reason: any) {
-        console.error('Error loading PDF:', reason);
+        console.error(`Error loading PDF from URL: ${fileUrl}`, reason);
         if (isMounted) {
-          setError(`Failed to load PDF. ${reason.message || 'Please ensure the URL is correct and the file is accessible.'}`);
+          setError(`Failed to load PDF from ${fileUrl}. ${reason.message || 'Please ensure the URL is correct and the file is accessible.'}`);
           setIsLoading(false);
         }
       }
@@ -103,12 +107,12 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
       };
       await page.render(renderContext).promise;
     } catch (e: any) {
-      if (typeof window !== 'undefined') console.error("Error rendering page: ", e);
-      setError(`Error rendering page ${pageNum}. ${e.message || ''}`);
+      if (typeof window !== 'undefined') console.error(`Error rendering page ${pageNum} of PDF from URL: ${fileUrl}`, e);
+      setError(`Error rendering page ${pageNum} of PDF from ${fileUrl}. ${e.message || ''}`);
     } finally {
       setPageRendering(false);
     }
-  }, [pdfDoc, pageNum, scale]);
+  }, [pdfDoc, pageNum, scale, fileUrl]); // Added fileUrl to dependency array for logging
 
   useEffect(() => {
     if (pdfDoc && pageNum > 0) {
@@ -161,7 +165,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
       <main className="flex-1 bg-muted/40 p-4 overflow-auto flex flex-col items-center justify-center">
         <div className="flex flex-col items-center">
           <Skeleton className="w-[calc(210mm*var(--tw-scale-x,1)*0.7)] h-[calc(297mm*var(--tw-scale-y,1)*0.7)] max-w-4xl max-h-[90vh] bg-background shadow-lg rounded-md" style={{ '--tw-scale-x': scale, '--tw-scale-y': scale } as React.CSSProperties} />
-          <p className="mt-4 text-muted-foreground">Loading PDF...</p>
+          <p className="mt-4 text-muted-foreground">Loading PDF ({fileUrl})...</p>
         </div>
       </main>
     );
@@ -174,7 +178,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
           <AlertCircle className="h-12 w-12 text-destructive mb-4" />
           <p className="text-lg font-semibold text-destructive">Error Loading PDF</p>
           <p className="text-sm text-muted-foreground mt-2 mb-1">{error}</p>
-          <p className="text-xs text-muted-foreground break-all">URL: {fileUrl || 'N/A'}</p>
+          <p className="text-xs text-muted-foreground break-all">Attempted URL: {fileUrl || 'N/A'}</p>
           <Button variant="outline" onClick={() => {setError(null); setIsLoading(true); setPageNum(1); /* consider re-calling loadPdf or relying on fileUrl change */ }} className="mt-4">
             Try Again
           </Button>
@@ -189,7 +193,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
         <div className="w-full max-w-xl bg-background shadow-lg rounded-md flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
            <p className="text-lg font-semibold">No PDF Loaded or Empty PDF</p>
-           <p className="text-sm">The PDF could not be processed or is empty.</p>
+           <p className="text-sm">The PDF at {fileUrl} could not be processed or is empty.</p>
         </div>
       </main>
     );
