@@ -1,10 +1,11 @@
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Edit2, Mail, Shield, User } from "lucide-react";
+import { Edit2, Mail, Shield, User, Lock } from "lucide-react";
 
 // Placeholder user data - in a real app, this would come from auth context or API
 const user = {
