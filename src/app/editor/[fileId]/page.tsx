@@ -12,6 +12,18 @@ interface EditorPageProps {
 async function getFileDetails(fileId: string) {
   // In a real app, fetch from Firestore or your backend
   await new Promise(resolve => setTimeout(resolve, 50)); // Simulate API delay
+
+  if (fileId === "sample-document") {
+    return {
+      id: "sample-document",
+      name: "Sample_Document.pdf",
+      // You could provide a real public URL to a sample PDF here if PdfViewer supported it
+      // For now, PdfViewer will show its placeholder content with this name.
+    };
+  }
+  
+  // Mock data for other file IDs, assuming they exist for logged-in users if we reach here.
+  // In a real app, you'd query Firestore. If not found, you'd handle that (e.g., 404).
   return {
     id: fileId,
     name: `Document_${fileId}.pdf`, 
@@ -23,7 +35,8 @@ export default async function EditorPage({ params }: EditorPageProps) {
   const fileDetails = await getFileDetails(params.fileId);
 
   if (!fileDetails) {
-    return <div className="container mx-auto p-4 text-center">File not found.</div>;
+    // This could be a redirect to a 404 page or the homepage
+    return <div className="container mx-auto p-4 text-center">File not found or you do not have permission to view it.</div>;
   }
   
   return (
@@ -32,7 +45,8 @@ export default async function EditorPage({ params }: EditorPageProps) {
       <header className="flex items-center justify-between p-3 border-b bg-background shadow-sm shrink-0">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/dashboard" aria-label="Back to Dashboard">
+            {/* If it's a sample document, link back to home, otherwise to dashboard */}
+            <Link href={params.fileId === "sample-document" ? "/" : "/dashboard"} aria-label="Back">
               <ChevronLeft className="h-5 w-5" />
             </Link>
           </Button>
@@ -41,13 +55,14 @@ export default async function EditorPage({ params }: EditorPageProps) {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5">
+          {/* For a sample document, these buttons would likely be disabled or have different behavior */}
+          <Button variant="outline" size="sm" className="gap-1.5" disabled={params.fileId === "sample-document"}>
             <Share2 className="h-4 w-4" /> Share
           </Button>
           <Button variant="outline" size="sm" className="gap-1.5">
             <Download className="h-4 w-4" /> Download
           </Button>
-          <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button size="sm" className="gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground" disabled={params.fileId === "sample-document"}>
             <Save className="h-4 w-4" /> Save
           </Button>
         </div>
@@ -56,7 +71,9 @@ export default async function EditorPage({ params }: EditorPageProps) {
       {/* Editor Main Area */}
       <div className="flex flex-1 overflow-hidden">
         <EditorToolbar />
-        <PdfViewer fileUrl={`/api/placeholder-pdf/${params.fileId}`} /> {/* Placeholder URL */}
+        {/* For a real sample PDF, you'd pass its URL here. 
+            Using a generic placeholder URL for now, PdfViewer will display the file name. */}
+        <PdfViewer fileUrl={`/api/placeholder-pdf/${fileDetails.id}`} />
       </div>
     </div>
   );

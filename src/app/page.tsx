@@ -50,12 +50,12 @@ export default function HomePage() {
           <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
             The ultimate cloud-based PDF editor and annotator. Upload, view, edit, and collaborate on your PDF documents with unparalleled ease and security.
           </p>
-          <div className="space-x-4">
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
             <Button size="lg" asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
               <Link href="/register">Get Started for Free</Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="#features">Learn More</Link>
+              <Link href="/editor/sample-document">Try Our Editor</Link>
             </Button>
           </div>
           <div className="mt-16 relative max-w-4xl mx-auto">
