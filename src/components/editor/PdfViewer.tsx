@@ -2,19 +2,15 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
-import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/webpack';
+import type { PDFDocumentProxy, PDFPageProxy, PDFDocumentLoadingTask } from 'pdfjs-dist';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight, AlertCircle, FileText } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Configure the PDF.js worker.
-// PDF.js worker is now expected to be in the /public directory.
-if (typeof window !== 'undefined') { // Ensure this only runs in the browser
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
-}
-
+// The 'pdfjs-dist/webpack' entry point should configure the worker automatically.
+// So, manual workerSrc configuration is typically not needed with this import.
 
 interface PdfViewerProps {
   fileUrl: string;
@@ -32,7 +28,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
 
   useEffect(() => {
     let isMounted = true;
-    let currentLoadingTask: pdfjsLib.PDFDocumentLoadingTask | null = null;
+    let currentLoadingTask: PDFDocumentLoadingTask | null = null;
     let currentPdfDoc: PDFDocumentProxy | null = null;
 
     const loadPdf = async () => {
@@ -53,7 +49,7 @@ export default function PdfViewer({ fileUrl }: PdfViewerProps) {
       setNumPages(0);
 
       try {
-        currentLoadingTask = pdfjsLib.getDocument(fileUrl);
+        currentLoadingTask = getDocument(fileUrl);
         const loadedPdfDoc = await currentLoadingTask.promise;
         
         if (isMounted) {
