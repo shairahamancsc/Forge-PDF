@@ -1,47 +1,132 @@
 
+"use client";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Edit2, Mail, Shield, User, Lock } from "lucide-react";
+import { Edit2, Mail, User as UserIcon, Lock, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
+import { updateUserFullName, sendPasswordResetEmail, getCurrentUser } from "@/app/actions/auth"; // Server actions
 
-// Placeholder user data - in a real app, this would come from auth context or API
-const user = {
-  name: "Alex Johnson",
-  email: "alex.johnson@example.com",
-  avatarUrl: "https://placehold.co/150x150.png",
-  joinDate: "2023-05-15",
-  plan: "Free Tier", // or "Pro Tier"
+const getInitials = (name: string | null | undefined) => {
+  if (!name) return "U";
+  const names = name.split(' ');
+  let initials = names[0].substring(0, 1).toUpperCase();
+  if (names.length > 1 && names[names.length - 1]) {
+    initials += names[names.length - 1].substring(0, 1).toUpperCase();
+  }
+  return initials;
 };
 
-const getInitials = (name: string) => {
-    const names = name.split(' ');
-    let initials = names[0].substring(0, 1).toUpperCase();
-    if (names.length > 1) {
-      initials += names[names.length - 1].substring(0, 1).toUpperCase();
+export default function ProfilePage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const { toast } = useToast();
+
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [fullName, setFullName] = useState("");
+  
+  // Placeholder data for subscription - replace with actual logic
+  const [subscriptionPlan, setSubscriptionPlan] = useState("Free Tier"); 
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        router.push("/login");
+      } else {
+        setUser(currentUser);
+        setFullName(currentUser.user_metadata?.full_name || "");
+        // In a real app, fetch subscription status from your backend/Supabase
+        // For now, we use a placeholder
+      }
+      setIsLoading(false);
+    };
+    fetchUser();
+
+     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        setUser(null);
+        router.push('/login');
+      } else if (session?.user) {
+        setUser(session.user);
+        setFullName(session.user.user_metadata?.full_name || "");
+      }
+    });
+    return () => {
+      authListener?.unsubscribe();
+    };
+  }, [router, supabase.auth]);
+
+  const handleSaveChanges = async () => {
+    if (!user || fullName === (user.user_metadata?.full_name || "")) {
+      toast({ title: "No Changes", description: "Your full name hasn't changed." });
+      return;
     }
-    return initials;
+    setIsSaving(true);
+    const result = await updateUserFullName(user.id, fullName);
+    setIsSaving(false);
+    if (result.success) {
+      toast({ title: "Profile Updated", description: "Your full name has been updated." });
+      if (result.user) setUser(result.user); // Update local user state with potentially new metadata
+    } else {
+      toast({ title: "Update Failed", description: result.message, variant: "destructive" });
+    }
   };
 
-export default function ProfilePage() {
+  const handleChangePassword = async () => {
+    if (!user?.email) {
+        toast({ title: "Error", description: "User email not found.", variant: "destructive"});
+        return;
+    }
+    setIsLoading(true); // Use general loading state for this action
+    const result = await sendPasswordResetEmail(user.email);
+    setIsLoading(false);
+    if (result.success) {
+        toast({ title: "Password Reset Email Sent", description: result.message});
+    } else {
+        toast({ title: "Password Reset Failed", description: result.message, variant: "destructive"});
+    }
+  };
+
+
+  if (isLoading || !user) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-4rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const displayName = user.user_metadata?.full_name || user.email || "";
+  const joinDate = user.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : "N/A";
+  const avatarUrl = user.user_metadata?.avatar_url;
+
   return (
     <div className="container mx-auto py-12 px-4 md:px-6">
       <Card className="max-w-2xl mx-auto shadow-lg">
         <CardHeader className="items-center text-center">
           <div className="relative mb-4">
             <Avatar className="h-24 w-24 ring-4 ring-primary/50">
-              <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="profile picture" />
-              <AvatarFallback className="text-3xl">{getInitials(user.name)}</AvatarFallback>
+              <AvatarImage src={avatarUrl || `https://placehold.co/150x150.png?text=${getInitials(displayName)}`} alt={displayName} data-ai-hint="profile picture" />
+              <AvatarFallback className="text-3xl">{getInitials(displayName)}</AvatarFallback>
             </Avatar>
-            <Button variant="outline" size="icon" className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-background">
+            <Button variant="outline" size="icon" className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-background" disabled> {/* Avatar editing TBD */}
               <Edit2 className="h-4 w-4" />
               <span className="sr-only">Edit avatar</span>
             </Button>
           </div>
-          <CardTitle className="text-3xl font-headline">{user.name}</CardTitle>
-          <CardDescription>Joined on {new Date(user.joinDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</CardDescription>
+          <CardTitle className="text-3xl font-headline">{displayName}</CardTitle>
+          <CardDescription>Joined on {joinDate}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
@@ -50,8 +135,14 @@ export default function ProfilePage() {
               <div>
                 <Label htmlFor="fullName">Full Name</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input id="fullName" defaultValue={user.name} className="pl-10" />
+                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input 
+                    id="fullName" 
+                    value={fullName} 
+                    onChange={(e) => setFullName(e.target.value)} 
+                    className="pl-10" 
+                    disabled={isSaving}
+                  />
                 </div>
               </div>
               <div>
@@ -70,17 +161,10 @@ export default function ProfilePage() {
           <div>
             <h3 className="text-lg font-semibold mb-3 text-foreground">Security</h3>
             <div className="space-y-3">
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <Lock className="h-4 w-4" /> Change Password
+              <Button variant="outline" className="w-full justify-start gap-2" onClick={handleChangePassword} disabled={isLoading || isSaving}>
+                {isLoading || isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />} 
+                Change Password
               </Button>
-              {/* Optional: MFA settings */}
-              {/* <div className="flex items-center justify-between p-3 border rounded-md">
-                <div>
-                  <p className="font-medium">Two-Factor Authentication (MFA)</p>
-                  <p className="text-sm text-muted-foreground">Not enabled</p>
-                </div>
-                <Button variant="secondary" size="sm">Enable MFA</Button>
-              </div> */}
             </div>
           </div>
 
@@ -90,17 +174,19 @@ export default function ProfilePage() {
             <h3 className="text-lg font-semibold mb-3 text-foreground">Subscription</h3>
              <div className="flex items-center justify-between p-4 border rounded-md bg-secondary/30">
                 <div>
-                  <p className="font-medium text-foreground">Current Plan: <span className="text-primary font-semibold">{user.plan}</span></p>
-                  {user.plan === "Free Tier" && <p className="text-sm text-muted-foreground">Upgrade to Pro for unlimited documents and advanced features.</p>}
+                  <p className="font-medium text-foreground">Current Plan: <span className="text-primary font-semibold">{subscriptionPlan}</span></p>
+                  {subscriptionPlan === "Free Tier" && <p className="text-sm text-muted-foreground">Upgrade to Pro for unlimited documents and advanced features.</p>}
                 </div>
-                {user.plan === "Free Tier" && <Button variant="default" size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">Upgrade to Pro</Button>}
-                {user.plan !== "Free Tier" && <Button variant="outline" size="sm">Manage Subscription</Button>}
+                {subscriptionPlan === "Free Tier" && <Button variant="default" size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled>Upgrade to Pro</Button>} {/* Upgrade TBD */}
+                {subscriptionPlan !== "Free Tier" && <Button variant="outline" size="sm" disabled>Manage Subscription</Button>} {/* Manage TBD */}
               </div>
           </div>
 
         </CardContent>
         <CardFooter className="pt-6">
-          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">Save Changes</Button>
+          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" onClick={handleSaveChanges} disabled={isSaving}>
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Changes"}
+          </Button>
         </CardFooter>
       </Card>
     </div>

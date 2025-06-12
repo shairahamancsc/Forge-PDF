@@ -14,7 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Eye, EyeOff, Lock, Mail, User as UserIcon } from "lucide-react"; // Renamed User to UserIcon to avoid conflict
+import { Eye, EyeOff, Lock, Mail, User as UserIcon } from "lucide-react";
 import { useState } from "react";
 import { signUpWithEmail, signInWithGoogle } from "@/app/actions/auth";
 import { useRouter } from "next/navigation";
@@ -47,11 +47,19 @@ export default function RegisterForm() {
     setIsLoading(false);
 
     if (result.success) {
-      toast({ title: "Registration Successful", description: result.message });
-      router.push("/dashboard"); // Or to a verification pending page if email verification is implemented
+      toast({ title: "Registration Processing", description: result.message });
+      // Supabase might require email confirmation. If so, user isn't immediately signed in.
+      // If session is returned by signUp, they are signed in.
+      // For now, redirect to login to be safe, or to dashboard if message indicates signed in.
+      if (result.message?.includes("signed in")) {
+         router.push("/dashboard");
+      } else {
+         router.push("/login"); // Or a specific "check your email" page
+      }
+      router.refresh();
     } else {
       toast({ title: "Registration Failed", description: result.message, variant: "destructive" });
-      if (result.message?.toLowerCase().includes('email-already-in-use')) {
+      if (result.message?.toLowerCase().includes('user already registered')) {
          form.setError("email", { type: "manual", message: "This email is already registered." });
       } else {
          form.setError("password", { type: "manual", message: result.message });
@@ -61,13 +69,11 @@ export default function RegisterForm() {
 
   async function handleGoogleSignIn() {
     setIsLoading(true);
-    const result = await signInWithGoogle(); // This action can handle both sign-in and sign-up
-    setIsLoading(false);
-    if (result.success) {
-      toast({ title: "Google Sign-Up/In Successful", description: result.message });
-      router.push("/dashboard");
-    } else {
-      toast({ title: "Google Sign-Up/In Failed", description: result.message, variant: "destructive" });
+    // signInWithGoogle action now handles the redirect internally.
+    const result = await signInWithGoogle();
+    if (result && !result.success) {
+        setIsLoading(false);
+        toast({ title: "Google Sign-Up/In Failed", description: result.message, variant: "destructive" });
     }
   }
 

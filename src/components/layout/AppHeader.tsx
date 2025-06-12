@@ -6,32 +6,52 @@ import Logo from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import UserNav from './UserNav';
 import { useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { usePathname } from 'next/navigation';
+import type { User } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/client'; // Use client Supabase
+import { usePathname, useRouter } from 'next/navigation';
 
 export default function AppHeader() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const fetchUser = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
       setIsLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+    };
 
-  // Don't render header on auth pages if user is already decided (to prevent flicker)
-  const isAuthPage = pathname === '/login' || pathname === '/register';
+    fetchUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (event === 'SIGNED_IN' && (pathname === '/login' || pathname === '/register')) {
+        router.refresh(); // Refresh to ensure server components know about the new session
+      }
+      if (event === 'SIGNED_OUT') {
+        router.refresh();
+      }
+    });
+
+    return () => {
+      authListener?.unsubscribe();
+    };
+  }, [pathname, router, supabase.auth]);
+
+  const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/auth/callback';
+  
   if (isLoading && isAuthPage) {
-    return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"><div className="container flex h-16 items-center justify-between"><Logo /></div></header>; // Minimal header during load on auth pages
-  }
-  if (!isLoading && user && isAuthPage) {
-    // User is logged in and on an auth page, typically means they are being redirected.
-    // Render minimal or null header until redirect completes to avoid flashing full header.
     return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"><div className="container flex h-16 items-center justify-between"><Logo /></div></header>;
+  }
+  if (!isLoading && user && isAuthPage && pathname !== '/auth/callback' ) {
+     // User is logged in and on an auth page, typically means they are being redirected by router.push or manually navigated.
+     // For Supabase, if a session exists, /login and /register should ideally redirect to /dashboard via middleware or page logic.
+     // This client-side redirect is a fallback.
+     router.push('/dashboard'); // Redirect to dashboard
+     return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"><div className="container flex h-16 items-center justify-between"><Logo /></div></header>;
   }
 
 
@@ -54,12 +74,16 @@ export default function AppHeader() {
             </>
           ) : (
             <>
-              <Button variant="ghost" asChild>
-                <Link href="/login">Login</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/register">Sign Up</Link>
-              </Button>
+              {pathname !== '/login' && (
+                <Button variant="ghost" asChild>
+                  <Link href="/login">Login</Link>
+                </Button>
+              )}
+              {pathname !== '/register' && (
+                <Button asChild>
+                  <Link href="/register">Sign Up</Link>
+                </Button>
+              )}
             </>
           )}
         </nav>

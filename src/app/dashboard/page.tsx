@@ -5,16 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import FileUpload from "@/components/ui/FileUpload";
-import { ArrowDownUp, Download, Edit, FileText, Filter, GripVertical, List, MoreHorizontal, PlusCircle, Search, Loader2 } from "lucide-react";
+import { ArrowDownUp, Download, Edit, FileText, Filter, GripVertical, List, MoreHorizontal, PlusCircle, Search, Loader2, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import type { User } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/client';
 
-// Placeholder data for initial PDFs
 const initialUserPdfs = [
   { id: "1", name: "Contract_Draft_v3.pdf", size: "2.5 MB", lastModified: "2024-07-28", thumbnailUrl: "https://placehold.co/300x400.png?text=PDF1" },
   { id: "2", name: "Presentation_Slides.pdf", size: "10.1 MB", lastModified: "2024-07-27", thumbnailUrl: "https://placehold.co/300x400.png?text=PDF2" },
@@ -32,43 +31,49 @@ interface PdfDocument {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [pdfs, setPdfs] = useState<PdfDocument[]>(initialUserPdfs);
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-
-  // TODO: Implement view toggle (grid/list) state
-  // TODO: Implement sorting and filtering logic
   
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
+    const fetchUserAndRedirect = async () => {
+      const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+      if (error || !currentUser) {
+        router.push("/login"); 
       } else {
-        router.push("/login"); // Redirect to login if not authenticated
+        setUser(currentUser);
       }
       setIsLoadingAuth(false);
+    };
+
+    fetchUserAndRedirect();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (event === 'SIGNED_OUT' || (!currentUser && !isLoadingAuth)) { // Check !isLoadingAuth to avoid redirect during initial load
+        router.push('/login');
+      }
     });
-    return () => unsubscribe();
-  }, [router]);
+
+    return () => {
+      authListener?.unsubscribe();
+    };
+  }, [router, supabase.auth, isLoadingAuth]);
 
   const handleFileUpload = (file: File) => {
-    // TODO: Implement actual file upload to Firebase Storage
-    // and metadata saving to Firestore.
-    console.log("Uploaded on Dashboard by user:", user?.uid, file.name);
+    console.log("Uploaded on Dashboard by user:", user?.id, file.name);
     
     const newPdfId = file.name.replace(/[^a-zA-Z0-9_.-]/g, '-').toLowerCase() + '-' + Date.now();
     const newPdf: PdfDocument = {
       id: newPdfId,
       name: file.name,
       size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-      lastModified: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format
+      lastModified: new Date().toLocaleDateString('en-CA'),
       thumbnailUrl: `https://placehold.co/300x400.png?text=${encodeURIComponent(file.name.substring(0,10))}`,
     };
-
-    // Add to local state for immediate UI update (optional but good UX)
     setPdfs(prevPdfs => [newPdf, ...prevPdfs]);
-
-    // Navigate to the editor page for the new PDF
     router.push(`/editor/${newPdf.id}`);
   };
 
@@ -108,7 +113,6 @@ export default function DashboardPage() {
           <Button variant="outline" className="gap-2">
             <Filter className="h-4 w-4" /> Filter
           </Button>
-          {/* View toggle buttons - implement state for this */}
           <Button variant="outline" size="icon" aria-label="Grid view">
             <GripVertical className="h-4 w-4" />
           </Button>

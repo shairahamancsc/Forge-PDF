@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut, Settings, UserCircle } from "lucide-react";
 import Link from "next/link";
-import type { User } from "firebase/auth";
-import { signOut } from "@/app/actions/auth";
+import type { User } from "@supabase/supabase-js";
+import { signOut } from "@/app/actions/auth"; // Assuming this is now a Supabase action
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,11 +27,16 @@ export default function UserNav({ user }: UserNavProps) {
   const router = useRouter();
   const { toast } = useToast();
 
+  const getDisplayName = (user: User | null): string => {
+    if (!user) return "User";
+    return user.user_metadata?.full_name || user.email || "User";
+  };
+
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "U";
     const names = name.split(' ');
     let initials = names[0].substring(0, 1).toUpperCase();
-    if (names.length > 1) {
+    if (names.length > 1 && names[names.length - 1]) {
       initials += names[names.length - 1].substring(0, 1).toUpperCase();
     }
     return initials;
@@ -41,33 +46,39 @@ export default function UserNav({ user }: UserNavProps) {
     const result = await signOut();
     if (result.success) {
       toast({ title: "Signed Out", description: "You have been successfully signed out." });
-      router.push('/'); // Redirect to homepage or login
+      router.push('/'); 
+      router.refresh(); // Important to ensure layout re-renders and server components know user is signed out
     } else {
       toast({ title: "Sign Out Failed", description: result.message, variant: "destructive" });
     }
   };
 
   if (!user) {
-    return null; // Or some other placeholder if needed
+    return null; 
   }
+  
+  const displayName = getDisplayName(user);
+  const avatarUrl = user.user_metadata?.avatar_url; // Supabase often stores avatar_url in user_metadata
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User Avatar"} data-ai-hint="user avatar" />
-            <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+            <AvatarImage src={avatarUrl || undefined} alt={displayName} data-ai-hint="user avatar" />
+            <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.displayName || "User"}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
-            </p>
+            <p className="text-sm font-medium leading-none">{displayName}</p>
+            {user.email && (
+              <p className="text-xs leading-none text-muted-foreground">
+                {user.email}
+              </p>
+            )}
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

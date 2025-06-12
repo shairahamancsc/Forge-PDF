@@ -47,6 +47,7 @@ export default function LoginForm() {
     if (result.success) {
       toast({ title: "Login Successful", description: result.message });
       router.push("/dashboard");
+      router.refresh(); // Ensure layout re-renders with new auth state
     } else {
       toast({ title: "Login Failed", description: result.message, variant: "destructive" });
       form.setError("password", { type: "manual", message: result.message });
@@ -55,14 +56,15 @@ export default function LoginForm() {
 
   async function handleGoogleSignIn() {
     setIsLoading(true);
-    const result = await signInWithGoogle();
-    setIsLoading(false);
-    if (result.success) {
-      toast({ title: "Google Sign-In Successful", description: result.message });
-      router.push("/dashboard");
-    } else {
-      toast({ title: "Google Sign-In Failed", description: result.message, variant: "destructive" });
+    // signInWithGoogle action now handles the redirect internally.
+    // We don't expect a direct result here if redirect occurs.
+    const result = await signInWithGoogle(); 
+    // If signInWithGoogle fails before redirecting (e.g. Supabase client error), it will return an error.
+    if (result && !result.success) {
+        setIsLoading(false);
+        toast({ title: "Google Sign-In Failed", description: result.message, variant: "destructive" });
     }
+    // No setIsLoading(false) here if redirect is expected, as the page will navigate away.
   }
 
   const handleForgotPassword = async () => {
